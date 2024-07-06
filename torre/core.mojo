@@ -2,11 +2,6 @@ from bit import byte_swap
 from builtin.string import isdigit
 
 
-fn get_start_fen() -> StringLiteral:
-    return "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
-
-fn get_start_fen_board_only() -> StringLiteral:
-    return "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR"
 
 fn print_pretty_bitmask(bitmask: UInt64):
     """
@@ -128,38 +123,46 @@ struct Board:
 
     # __str__ overload
     fn __str__(self) -> String:
-        var board: String = ""
+        return self.stringify()
+    
+    fn stringify(self, pretty: Bool = True) -> String:
+        """
+        Returns a string representation of the board for display.
+        Set pretty=True to use fancy unicode chess pieces.
+        """
+        var s: String = ""
         for rank in range(UInt64(7), UInt64(-1), UInt64(-1)):
             for file in range(UInt64(8)):
                 var piece: UInt64 = 1 << (rank * 8 + file)
                 if self.bitmask_white_pawn & piece:
-                    board += "P "
+                    if pretty: s += "♙" else: s += "P "
                 elif self.bitmask_white_knight & piece:
-                    board += "N "
+                    if pretty: s += "♘" else: s += "N "
                 elif self.bitmask_white_bishop & piece:
-                    board += "B "
+                    if pretty: s += "♗" else: s += "B "
                 elif self.bitmask_white_rook & piece:
-                    board += "R "
+                    if pretty: s += "♖" else: s += "R "
                 elif self.bitmask_white_queen & piece:
-                    board += "Q "
+                    if pretty: s += "♕" else: s += "Q "
                 elif self.bitmask_white_king & piece:
-                    board += "K "
+                    if pretty: s += "♔" else: s += "K "
                 elif self.bitmask_black_pawn & piece:
-                    board += "p "
+                    if pretty: s += "♟" else: s += "p "
                 elif self.bitmask_black_knight & piece:
-                    board += "n "
+                    if pretty: s += "♞" else: s += "n "
                 elif self.bitmask_black_bishop & piece:
-                    board += "b "
+                    if pretty: s += "♝" else: s += "b "
                 elif self.bitmask_black_rook & piece:
-                    board += "r "
+                    if pretty: s += "♜" else: s += "r "
                 elif self.bitmask_black_queen & piece:
-                    board += "q "
+                    if pretty: s += "♛" else: s += "q "
                 elif self.bitmask_black_king & piece:
-                    board += "k "
+                    if pretty: s += "♚" else: s += "k "
                 else:
-                    board += "  "
-            board += "\n"
-        return board
+                    if pretty: s += "　" # unicode ideographic space U+3000
+                    else: s += "  "
+            s += "\n"
+        return s
     
     # Reset board
     fn reset_start_fen(inout self):
@@ -234,46 +237,48 @@ struct Board:
 
         # Try parse field 1: board FEN
         var fen_board_only: String = fen_fields[0]
+        if len(fen_board_only.split("/")) != 8:
+            raise Error("Failed to parse FEN string: there should be 8 board fields but found " + str(len(fen_board_only.split("/"))) + ".")
         var rank: UInt64 = 7
         var file: UInt64 = 0
-        var char: UInt8
+        var char: Int
         try:
             for i in range(len(fen_board_only)):
-                char = UInt8(ord(fen_board_only[i]))
-                if char == UInt8(ord("/")):
+                char = ord(fen_board_only[i])
+                if char == ord("/"):
                     rank -= 1
                     file = 0
                 else:
-                    if isdigit(UInt8(char)):
-                        file += UInt64(char)
+                    if isdigit(char):
+                        file += atol(chr(char))
                     else:
                         var piece: UInt64 = 1 << (rank * 8 + file)
-                        if char == UInt8(ord("P")):
+                        if char == ord("P"):
                             self.bitmask_white_pawn |= piece
-                        elif char == UInt8(ord("N")):
+                        elif char == ord("N"):
                             self.bitmask_white_knight |= piece
-                        elif char == UInt8(ord("B")):
+                        elif char == ord("B"):
                             self.bitmask_white_bishop |= piece
-                        elif char == UInt8(ord("R")):
+                        elif char == ord("R"):
                             self.bitmask_white_rook |= piece
-                        elif char == UInt8(ord("Q")):
+                        elif char == ord("Q"):
                             self.bitmask_white_queen |= piece
-                        elif char == UInt8(ord("K")):
+                        elif char == ord("K"):
                             self.bitmask_white_king |= piece
-                        elif char == UInt8(ord("p")):
+                        elif char == ord("p"):
                             self.bitmask_black_pawn |= piece
-                        elif char == UInt8(ord("n")):
+                        elif char == ord("n"):
                             self.bitmask_black_knight |= piece
-                        elif char == UInt8(ord("b")):
+                        elif char == ord("b"):
                             self.bitmask_black_bishop |= piece
-                        elif char == UInt8(ord("r")):
+                        elif char == ord("r"):
                             self.bitmask_black_rook |= piece
-                        elif char == UInt8(ord("q")):
+                        elif char == ord("q"):
                             self.bitmask_black_queen |= piece
-                        elif char == UInt8(ord("k")):
+                        elif char == ord("k"):
                             self.bitmask_black_king |= piece
                         else:
-                            raise "Invalid piece in FEN"
+                            raise "Invalid piece character in FEN string."
                         file += 1
         except Error:
             raise Error # ("Failed to parse FEN string: invalid board field.")
@@ -296,16 +301,16 @@ struct Board:
             self.castling_rights_black_kingside = False
             self.castling_rights_black_queenside = False
             for i in range(len(castling_rights)):
-                char = UInt8(ord(castling_rights[i]))
-                if char == UInt8(ord("K")):
+                char = ord(castling_rights[i])
+                if char == ord("K"):
                     self.castling_rights_white_kingside = True
-                elif char == UInt8(ord("Q")):
+                elif char == ord("Q"):
                     self.castling_rights_white_queenside = True
-                elif char == UInt8(ord("k")):
+                elif char == ord("k"):
                     self.castling_rights_black_kingside = True
-                elif char == UInt8(ord("q")):
+                elif char == ord("q"):
                     self.castling_rights_black_queenside = True
-                elif char == UInt8(ord("-")):
+                elif char == ord("-"):
                     break
                 else:
                     raise Error("Failed to parse FEN string: invalid castling rights field.")
